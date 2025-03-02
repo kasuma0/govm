@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type GoVersion struct {
@@ -25,17 +26,66 @@ type GoVersion struct {
 	Stable    bool
 }
 
+type SwitchCompletedMsg struct {
+	Version    string
+	ShimInPath bool
+}
+
 type DownloadCompleteMsg struct {
 	Version string
 	Path    string
 }
 
-type SwitchCompletedMsg struct {
-	Version string
+func SetupShimDirectory() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %v", err)
+	}
+
+	govmDir := filepath.Join(homeDir, ".govm")
+	if err := os.MkdirAll(govmDir, 0755); err != nil {
+		return fmt.Errorf("failed to create govm directory: %v", err)
+	}
+
+	shimDir := filepath.Join(govmDir, "shim")
+	if err := os.MkdirAll(shimDir, 0755); err != nil {
+		return fmt.Errorf("failed to create shim directory: %v", err)
+	}
+
+	return nil
 }
 
+// Check if user has shim
+func IsShimInPath() bool {
+	homeDir, _ := os.UserHomeDir()
+	shimDir := filepath.Join(homeDir, ".govm", "shim")
+
+	currentPath := os.Getenv("PATH")
+	pathSeparator := string(os.PathListSeparator)
+	pathEntries := strings.Split(currentPath, pathSeparator)
+
+	for _, entry := range pathEntries {
+		if entry == shimDir {
+			return true
+		}
+	}
+
+	return false
+}
+
+func GetShimPathInstructions() string {
+	if runtime.GOOS == "windows" {
+		return "Add to PATH: %USERPROFILE%\\.govm\\shim"
+	} else {
+		return "Add to your shell config: export PATH=\"$HOME/.govm/shim:$PATH\""
+	}
+}
 func FetchGoVersions() tea.Msg {
-	resp, err := http.Get("https://go.dev/dl/?mode=json&include=all")
+	// I randomly put 10 second here
+	client := &http.Client{
+		Timeout: 10 * 1000000000,
+	}
+	resp, err := client.Get("https://go.dev/dl/?mode=json&include=all")
 	if err != nil {
 		return ErrMsg(fmt.Errorf("failed to connect to go.dev: %v", err))
 	}
@@ -65,6 +115,7 @@ func FetchGoVersions() tea.Msg {
 	currentOS := runtime.GOOS
 	arch := runtime.GOARCH
 
+	// Get home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ErrMsg(err)
@@ -76,7 +127,13 @@ func FetchGoVersions() tea.Msg {
 		return ErrMsg(err)
 	}
 
-	activeVersion := GetCurrentGoVersion()
+	activeVersion := ""
+	activeVersionFile := filepath.Join(homeDir, ".govm", "active_version")
+	if versionBytes, err := os.ReadFile(activeVersionFile); err == nil {
+		activeVersion = string(versionBytes)
+	} else {
+		activeVersion = GetCurrentGoVersion()
+	}
 
 	installedVersions := map[string]string{}
 	entries, _ := os.ReadDir(goVersionsDir)
@@ -134,6 +191,7 @@ func FetchGoVersions() tea.Msg {
 			}
 		}
 
+		// Compare minor versions
 		if len(iParts) > 1 && len(jParts) > 1 {
 			iMinor, _ := strconv.Atoi(iParts[1])
 			jMinor, _ := strconv.Atoi(jParts[1])
@@ -186,6 +244,8 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 		}
 
 		versionDir := filepath.Join(goVersionsDir, fmt.Sprintf("go%s", version.Version))
+
+		// Check if already installed - REMOVE IT FIRST to avoid corrupted installations
 		if _, err := os.Stat(versionDir); err == nil {
 			if err := os.RemoveAll(versionDir); err != nil {
 				return ErrMsg(fmt.Errorf("failed to remove existing installation: %v", err))
@@ -264,7 +324,6 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 
 		goBin := filepath.Join(versionDir, "bin", "go")
 		if _, err := os.Stat(goBin); os.IsNotExist(err) {
-			// The extract may have used a different directory name
 			entries, _ := os.ReadDir(goVersionsDir)
 			for _, entry := range entries {
 				if entry.IsDir() && strings.HasPrefix(entry.Name(), "go") {
@@ -303,67 +362,66 @@ func SwitchVersion(version GoVersion) tea.Cmd {
 			return ErrMsg(err)
 		}
 
-		govmDir := filepath.Join(homeDir, ".govm")
-		if err := os.MkdirAll(govmDir, 0755); err != nil {
+		if err := SetupShimDirectory(); err != nil {
 			return ErrMsg(err)
 		}
 
-		if err := createShellConfigs(govmDir, version.Path, version.Version); err != nil {
-			return ErrMsg(err)
+		shimDir := filepath.Join(homeDir, ".govm", "shim")
+
+		versionBinDir := filepath.Join(version.Path, "bin")
+
+		if _, err := os.Stat(versionBinDir); os.IsNotExist(err) {
+			return ErrMsg(fmt.Errorf("go version directory not found: %s", versionBinDir))
 		}
 
-		if runtime.GOOS != "windows" {
-			symlink := filepath.Join(govmDir, "current")
-			os.Remove(symlink) // Ignore error if it doesn't exist
-			if err := os.Symlink(version.Path, symlink); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to create symlink: %v\n", err)
+		entries, err := os.ReadDir(versionBinDir)
+		if err != nil {
+			return ErrMsg(fmt.Errorf("failed to read bin directory: %v", err))
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				binName := entry.Name()
+				targetBin := filepath.Join(versionBinDir, binName)
+				shimPath := filepath.Join(shimDir, binName)
+
+				os.Remove(shimPath)
+
+				if runtime.GOOS == "windows" {
+					shimContent := fmt.Sprintf(`@echo off
+"%s" %%*
+`, targetBin)
+
+					if err := os.WriteFile(shimPath+".bat", []byte(shimContent), 0755); err != nil {
+						return ErrMsg(fmt.Errorf("failed to create shim for %s: %v", binName, err))
+					}
+				} else {
+					shimContent := fmt.Sprintf(`#!/bin/bash
+"%s" "$@"
+`, targetBin)
+
+					if err := os.WriteFile(shimPath, []byte(shimContent), 0755); err != nil {
+						return ErrMsg(fmt.Errorf("failed to create shim for %s: %v", binName, err))
+					}
+
+					if err := os.Chmod(shimPath, 0755); err != nil {
+						return ErrMsg(fmt.Errorf("failed to make shim executable: %v", err))
+					}
+				}
 			}
 		}
 
-		return SwitchCompletedMsg{Version: version.Version}
+		versionFile := filepath.Join(homeDir, ".govm", "active_version")
+		if err := os.WriteFile(versionFile, []byte(version.Version), 0644); err != nil {
+			return ErrMsg(fmt.Errorf("failed to update active version file: %v", err))
+		}
+
+		shimInPath := IsShimInPath()
+
+		return SwitchCompletedMsg{
+			Version:    version.Version,
+			ShimInPath: shimInPath,
+		}
 	}
 }
 
-func createShellConfigs(govmDir, versionDir, version string) error {
-	shellConfig := filepath.Join(govmDir, "govm.sh")
-	shellContent := fmt.Sprintf(`#!/bin/bash
-# GoVM configuration - Go %s
-export GOROOT="%s"
-export PATH="$GOROOT/bin:$PATH"
-echo "Activated Go %s"
-`, version, versionDir, version)
-
-	if err := os.WriteFile(shellConfig, []byte(shellContent), 0755); err != nil {
-		return fmt.Errorf("failed to create shell config: %v", err)
-	}
-
-	// For Windows
-	// TBH I have no clue if this works or not
-	if runtime.GOOS == "windows" {
-		batchFile := filepath.Join(govmDir, "govm.bat")
-		batchContent := fmt.Sprintf(`@echo off
-REM GoVM configuration - Go %s
-SET GOROOT=%s
-SET PATH=%%GOROOT%%\bin;%%PATH%%
-echo Activated Go %s
-`, version, versionDir, version)
-
-		if err := os.WriteFile(batchFile, []byte(batchContent), 0755); err != nil {
-			return fmt.Errorf("failed to create batch file: %v", err)
-		}
-
-		// PowerShell script
-		psFile := filepath.Join(govmDir, "govm.ps1")
-		psContent := fmt.Sprintf(`# GoVM configuration - Go %s
-$env:GOROOT = "%s"
-$env:PATH = "$env:GOROOT\bin;$env:PATH"
-Write-Host "Activated Go %s"
-`, version, versionDir, version)
-
-		if err := os.WriteFile(psFile, []byte(psContent), 0755); err != nil {
-			return fmt.Errorf("failed to create PowerShell script: %v", err)
-		}
-	}
-
-	return nil
-}

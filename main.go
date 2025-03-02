@@ -10,11 +10,27 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/melkeydev/govm/internal/model"
+	"github.com/melkeydev/govm/internal/setup"
 	"github.com/melkeydev/govm/internal/utils"
 )
 
 func main() {
+	if err := utils.SetupShimDirectory(); err != nil {
+		fmt.Printf("Warning: Failed to set up shim directory: %v\n", err)
+	}
+
+	// Check if this is first time setup
+	if !setup.IsShimInPath() {
+		setupModel := setup.New()
+		p := tea.NewProgram(setupModel, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error in setup: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3c71a8"))
@@ -51,7 +67,6 @@ func main() {
 		fmt.Println("Error getting home directory:", err)
 		os.Exit(1)
 	}
-
 	goVersionsDir := filepath.Join(homeDir, ".govm", "versions")
 
 	delegate := list.NewDefaultDelegate()
@@ -83,3 +98,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+
