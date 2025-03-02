@@ -104,37 +104,41 @@ You can do this by running this command in Command Prompt:
 
 %s
 
-Or by adding it through the Windows System Properties:
-1. Right-click on 'This PC' and select 'Properties'
-2. Click on 'Advanced system settings'
-3. Click 'Environment Variables'
-4. Edit the PATH variable and add the directory above
-
 After adding to PATH, restart your terminal.`,
 			highlightStyle.Render(m.shimPath),
 			highlightStyle.Render(fmt.Sprintf("setx PATH \"%%PATH%%;%s\"", m.shimPath)))
 	} else {
+		shellConfigFile := "~/.bashrc"
+
+		if strings.Contains(os.Getenv("SHELL"), "zsh") {
+			shellConfigFile = "~/.zshrc"
+		}
+
 		setupInstructions = fmt.Sprintf(`To use GoVM, you need to add this directory to your PATH:
 
 %s
 
-Add the following line to your %s:
+Option 1: Run this command to add it automatically:
 
 %s
 
-Then restart your terminal or run:
+Option 2: Or manually add this line to your %s:
+
+%s
+
+After adding to PATH, restart your terminal or run:
 
 %s`,
 			highlightStyle.Render(m.shimPath),
-			m.shellConfig,
-			highlightStyle.Render(fmt.Sprintf("export PATH=\"%s:$PATH\"", m.shimPath)),
-			highlightStyle.Render(fmt.Sprintf("source %s", m.shellConfig)))
+			highlightStyle.Render(fmt.Sprintf("echo 'export PATH=\"$HOME/.govm/shim:$PATH\"' >> %s", shellConfigFile)),
+			shellConfigFile,
+			highlightStyle.Render(fmt.Sprintf("export PATH=\"$HOME/.govm/shim:$PATH\"")),
+			highlightStyle.Render(fmt.Sprintf("source %s", shellConfigFile)))
 	}
 
 	box := boxStyle.Render(setupInstructions)
 	footer := footerStyle.Render(m.keyPrompt)
 
-	// Center everything
 	paddingTop := max(0, (m.height-lipgloss.Height(title)-lipgloss.Height(box)-lipgloss.Height(footer)-4)/2)
 	padTopStr := strings.Repeat("\n", paddingTop)
 
