@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -11,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/melkeydev/govm/internal/cli"
 	"github.com/melkeydev/govm/internal/model"
 	"github.com/melkeydev/govm/internal/setup"
 	"github.com/melkeydev/govm/internal/utils"
@@ -21,7 +23,72 @@ func main() {
 		fmt.Printf("Warning: Failed to set up shim directory: %v\n", err)
 	}
 
-	// Check if this is first time setup
+	if len(os.Args) > 1 {
+		handleCommandLine()
+		return
+	}
+
+	// handleCommandLine and TUI should never throw at the same time
+	launchTUI()
+}
+
+func handleCommandLine() {
+	if len(os.Args) < 2 {
+		printUsage()
+		return
+	}
+
+	command := os.Args[1]
+
+	switch command {
+	case "install":
+		if len(os.Args) < 3 {
+			fmt.Println("Error: 'install' requires a version argument")
+			fmt.Println("Usage: govm install <version>")
+			fmt.Println("Example: govm install 1.21")
+			return
+		}
+		version := os.Args[2]
+		version = strings.TrimPrefix(version, "go")
+		cli.InstallVersion(version)
+
+	case "use":
+		if len(os.Args) < 3 {
+			fmt.Println("Error: 'use' requires a version argument")
+			fmt.Println("Usage: govm use <version>")
+			fmt.Println("Example: govm use 1.21")
+			return
+		}
+		version := os.Args[2]
+		version = strings.TrimPrefix(version, "go")
+		cli.UseVersion(version)
+
+	case "list":
+		cli.ListVersions()
+
+	case "help":
+		printUsage()
+
+	default:
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
+	}
+}
+
+func printUsage() {
+	fmt.Println("GoVM - Go Version Manager")
+	fmt.Println("\nUsage:")
+	fmt.Println("  govm                   Launch the interactive TUI")
+	fmt.Println("  govm install <version> Install a specific Go version")
+	fmt.Println("  govm use <version>     Switch to a specific Go version")
+	fmt.Println("  govm list              List installed Go versions")
+	fmt.Println("  govm help              Show this help message")
+	fmt.Println("\nExamples:")
+	fmt.Println("  govm install 1.21      Install Go 1.21.x (latest)")
+	fmt.Println("  govm use 1.20          Switch to Go 1.20.x (latest)")
+}
+
+func launchTUI() {
 	if !setup.IsShimInPath() {
 		setupModel := setup.New()
 		p := tea.NewProgram(setupModel, tea.WithAltScreen())
@@ -67,6 +134,7 @@ func main() {
 		fmt.Println("Error getting home directory:", err)
 		os.Exit(1)
 	}
+
 	goVersionsDir := filepath.Join(homeDir, ".govm", "versions")
 
 	delegate := list.NewDefaultDelegate()
@@ -98,4 +166,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
