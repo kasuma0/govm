@@ -34,3 +34,19 @@ archives:
       - LICENSE
 checksum:
   name_template: 'checksums.txt'
+
+brews:
+  - name: "{{ .ProjectName }}"
+    homepage: "https://github.com/melkeydev/govm"
+    description: "GoVM - Go Version Manager"
+    license: "MIT"
+    repository:
+      owner: "melkeydev"
+      name: "homebrew-tap"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@goreleaser.com
+    directory: Formula
+    install: |
+      bin.install "{{ .ProjectName }}"
