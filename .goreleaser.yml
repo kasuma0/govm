@@ -43,7 +43,7 @@ brews:
     repository:
       owner: "melkeydev"
       name: "homebrew-tap"
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     commit_author:
       name: goreleaserbot
       email: goreleaser@goreleaser.com
