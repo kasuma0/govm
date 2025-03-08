@@ -1,3 +1,5 @@
+![logo](./assets/govm_readme.png)
+
 # GoVM - Go Version Manager
 
 GoVM is a modern tool for managing multiple Go versions on your system. It features both a clean Terminal UI (TUI) and a command-line interface for easy installation and switching between Go versions.
@@ -9,7 +11,7 @@ GoVM is a modern tool for managing multiple Go versions on your system. It featu
 - Install any available Go version directly from go.dev
 - Switch between installed versions with a single command
 - Supports partial version numbers (e.g., `1.21` for latest 1.21.x)
-- Works on Windows, macOS, and Linux
+- Works on macOS and Linux. Looking for testing for Windows
 
 ## Installation
 
@@ -17,18 +19,19 @@ GoVM is a modern tool for managing multiple Go versions on your system. It featu
 
 - Go 1.18 or higher
 
-### Install from source
+### Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/melkeydev/govm.git
-cd govm
-
-# Build and install
-go build -o govm
+go install github.com/melkeydev/govm@latest
 ```
 
-Then place the binary somewhere in your PATH.
+Then in a new terminal run:
+
+```bash
+govm
+```
+
+To launch the TUI
 
 ## First-Time Setup
 
@@ -68,6 +71,23 @@ Then restart your terminal.
 
 GoVM can be used in two ways: via the interactive TUI or through command-line commands.
 
+### Terminal User Interface (TUI)
+
+Launch the interactive TUI by running govm without arguments:
+
+```bash
+govm
+```
+
+#### Navigation
+
+- Use the arrow keys to navigate through the list of versions
+- Press `i` to install the selected version
+- Press `u` to use/switch to the selected version
+- Press `r` to refresh the list of available versions
+- Press `Tab` to switch between "Available Versions" and "Installed Versions" views
+- Press `q` to quit
+
 ### Command Line Interface
 
 ```bash
@@ -87,23 +107,6 @@ govm help
 govm
 ```
 
-### Terminal User Interface (TUI)
-
-Launch the interactive TUI by running govm without arguments:
-
-```bash
-govm
-```
-
-#### Navigation
-
-- Use the arrow keys to navigate through the list of versions
-- Press `i` to install the selected version
-- Press `u` to use/switch to the selected version
-- Press `r` to refresh the list of available versions
-- Press `Tab` to switch between "Available Versions" and "Installed Versions" views
-- Press `q` to quit
-
 ## How It Works
 
 GoVM downloads Go versions from the official go.dev website and installs them in `~/.govm/versions`. It uses a "shim" approach:
@@ -113,6 +116,19 @@ GoVM downloads Go versions from the official go.dev website and installs them in
 - Switching versions simply updates these wrappers to point to a different installation
 
 This ensures a seamless experience without needing to manually update environment variables or source scripts each time you switch versions.
+
+### Install from source
+
+```bash
+# Clone the repository
+git clone https://github.com/melkeydev/govm.git
+cd govm
+
+# Build and install
+go build -o govm
+```
+
+Then place the binary somewhere in your PATH.
 
 ## Dependencies
 
