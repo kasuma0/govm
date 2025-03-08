@@ -130,6 +130,20 @@ go build -o govm
 
 Then place the binary somewhere in your PATH.
 
+### Homebrew
+
+Add Homebrew repository to the system:
+
+```bash
+brew tap melkeydev/tap
+```
+
+You can then install your package with:
+
+```bash
+brew install govm
+```
+
 ## Dependencies
 
 - [Charm Bubbletea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
