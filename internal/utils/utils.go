@@ -233,19 +233,14 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 		if err != nil {
 			return ErrMsg(err)
 		}
-
 		goVersionsDir := filepath.Join(homeDir, ".govm", "versions")
 		downloadDir := filepath.Join(homeDir, ".govm", "downloads")
-
 		for _, dir := range []string{goVersionsDir, downloadDir} {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return ErrMsg(err)
 			}
 		}
-
 		versionDir := filepath.Join(goVersionsDir, fmt.Sprintf("go%s", version.Version))
-
-		// Check if already installed - REMOVE IT FIRST to avoid corrupted installations
 		if _, err := os.Stat(versionDir); err == nil {
 			if err := os.RemoveAll(versionDir); err != nil {
 				return ErrMsg(fmt.Errorf("failed to remove existing installation: %v", err))
@@ -253,7 +248,6 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 		}
 
 		downloadPath := filepath.Join(downloadDir, version.Filename)
-
 		if _, err := os.Stat(downloadPath); err == nil {
 			if err := os.Remove(downloadPath); err != nil {
 				return ErrMsg(fmt.Errorf("failed to remove existing download: %v", err))
@@ -276,22 +270,10 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 		if err != nil {
 			return ErrMsg(err)
 		}
-
 		if written == 0 {
 			return ErrMsg(fmt.Errorf("downloaded empty file"))
 		}
-
 		out.Close()
-
-		entries, _ := os.ReadDir(goVersionsDir)
-		for _, entry := range entries {
-			if entry.IsDir() && strings.HasPrefix(entry.Name(), "go") {
-				dirPath := filepath.Join(goVersionsDir, entry.Name())
-				if dirPath != versionDir {
-					os.RemoveAll(dirPath)
-				}
-			}
-		}
 
 		var cmd *exec.Cmd
 		if runtime.GOOS == "windows" {
@@ -349,6 +331,12 @@ func DownloadAndInstall(version GoVersion) tea.Cmd {
 		verifyOutput, err := verifyCmd.CombinedOutput()
 		if err != nil {
 			return ErrMsg(fmt.Errorf("Go binary verification failed: %v\nOutput: %s", err, string(verifyOutput)))
+		}
+
+		// Remove the existing downloads since they should be installed
+		if err := os.Remove(downloadPath); err != nil {
+			// Just log the error but don't fail the installation
+			fmt.Printf("Warning: failed to clean up download file: %v\n", err)
 		}
 
 		return DownloadCompleteMsg{Version: version.Version, Path: versionDir}
@@ -424,4 +412,3 @@ func SwitchVersion(version GoVersion) tea.Cmd {
 		}
 	}
 }
-
