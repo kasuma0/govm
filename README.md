@@ -33,6 +33,20 @@ govm
 
 To launch the TUI
 
+### Homebrew
+
+Add Homebrew repository to the system:
+
+```bash
+brew tap melkeydev/tap
+```
+
+You can then install your package with:
+
+```bash
+brew install govm
+```
+
 ## First-Time Setup
 
 When you first run GoVM, it will guide you through adding the required directory to your PATH. This is a one-time setup that enables GoVM to manage your Go versions.
