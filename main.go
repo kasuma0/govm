@@ -19,6 +19,12 @@ import (
 )
 
 func main() {
+	// Check if user is requesting version information
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("govm %s\n", utils.Version)
+		os.Exit(0)
+	}
+
 	if err := utils.SetupShimDirectory(); err != nil {
 		fmt.Printf("Warning: Failed to set up shim directory: %v\n", err)
 	}
