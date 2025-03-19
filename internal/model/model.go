@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
@@ -35,14 +36,15 @@ func (m Model) Init() tea.Cmd {
 		m.Spinner.Tick,
 	)
 }
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case tea.KeyCtrlC.String(), "q":
 			return m, tea.Quit
-		case "tab":
+		case tea.KeyTab.String():
 			// Switch between tabs
 			m.CurrentTab = (m.CurrentTab + 1) % 2
 			return m, nil
@@ -235,6 +237,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, tableCmd)
 	return m, tea.Batch(cmds...)
 }
+
 func (m *Model) updateInstalledTable() {
 	rows := []table.Row{}
 	for _, v := range m.Versions {
@@ -248,6 +251,7 @@ func (m *Model) updateInstalledTable() {
 	}
 	m.InstalledTable.SetRows(rows)
 }
+
 func (m Model) View() string {
 	if m.Err != nil {
 		return fmt.Sprintf("Error: %s\n\nPress any key to quit.", m.Err)
@@ -308,4 +312,3 @@ func (m Model) View() string {
 	}
 	return styles.AppStyle.Render(lipgloss.JoinVertical(lipgloss.Left, components...))
 }
-
